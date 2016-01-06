@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FPS</title>
+  <style>
+    body {
+      background-color: #FFFFFF;
+      cursor: crosshair;
+      font-family: Georgia, Helvetica, sans-serif;
+      font-weight: bold;
+      margin: 0;
+      overflow: hidden;
+      padding: 0;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    #hud {
+      bottom: 10px;
+      position: absolute;
+      right: 10px;
+      z-index: 100;
+    }
+    p {
+      background-color: #EEEEEE;
+      border: 2px solid black;
+      display: inline-block;
+      margin: 0;
+      padding: 5px;
+    }
+
+    #giris {
+      background-color: #003333;
+      font: Helvetica;
+      color: #FFFFFF;
+      cursor: pointer;
+      font-size: 100px;
+      opacity: 0.7;
+      text-align: center;
+        
+        
+    }
+
+  </style>
+
+  
+  <script src="jquery-1.7.2.min.js"></script>
+  <script src="Three.js"></script>
+  <script src="Three.FirstPersonControls.js"></script>
+   
+    
+
+<script type="x-shader/x-vertex" id="vertexShader">
+     varying vec2 vUv;
+
+void main() {
+
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+}
+    </script>
+ <script type="x-shader/x-vertex" id="fragmentShader">
+       varying vec2 vUv;
+
+void main() {
+
+    // colour is RGBA: u, v, 0, 1
+    gl_FragColor = vec4( vec3( vUv, 0. ), 1. );
+
+}
+    </script>
+
+    
+</head>
+<body>
+    
+    <script>
+    
+    
+            var map = [ [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                        [1, 2, 0, 2, 0, 2, 2, 0, 2, 2, 0, 2, 0, 1], 
+                        [1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+                        [1, 2, 0, 0, 0, 0, 2, 0, 2, 0, 0, 2, 0, 1], 
+                        [1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                        [1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+                        [1, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 1],
+                        [1, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+                        [1, 2, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 2, 1], 
+                        [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                        [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 1],
+                        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+                        [1, 2, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 2, 1], 
+                        [1, 1, 1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1],
+                        [1, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1], 
+                        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]];
+
+
+            var mapW = map.length, mapH = map[0].length;
+
+
+            // VARIABLES 
+            var WIDTH = window.innerWidth,
+                HEIGHT = window.innerHeight,
+                UNITSIZE = 200,
+                WALLHEIGHT = UNITSIZE / 3,
+                MOVESPEED = 100,
+                LOOKSPEED = 0.075,
+                MONS = 20;
+        	PROJECTILEDAMAGE = 20;
+
+
+            var t = THREE;
+            var scene, cam, renderer, controls, clock, projector,stats, items=[],trees=[];
+            var runAnim = true, mouse = { x: 0, y: 0 }, kills = 0, item = 0;
+            var itemCube, lastitemPickup = 0;
+            var itemcount = 5,
+             health=10;
+        
+        
+        
+
+
+            // INTRO SCREEN 
+$(document).ready(function () {
+                $('body').append('<div id="giris">PLAY</div>');
+                $('#giris').css({width: WIDTH, height: HEIGHT}).one('click', function (e) {
+                    e.preventDefault();
+                    $(this).fadeOut();
+                    init();
+                    animate();
+                });
+            });
+
+
+            //  INITIAL Setup
+function init() {
+                clock = new t.Clock();
+                projector = new t.Projector();
+                scene = new t.Scene();
+                scene.fog = new t.FogExp2(0xD6F1FF, 0.0005);
+
+                // Set up camera
+                cam = new t.PerspectiveCamera(60, (WIDTH / HEIGHT), 1, 10000);
+                cam.position.y = UNITSIZE * 0.2;
+                scene.add(cam);
+
+                controls = new t.FirstPersonControls(cam);
+                controls.movementSpeed = MOVESPEED;
+                controls.lookSpeed = LOOKSPEED;
+                controls.lookVertical = false;
+                controls.noFly = true;
+
+                // World objects
+                setupScene();
+
+                setupAI();
+
+
+                renderer = new t.WebGLRenderer();
+                renderer.setSize(WIDTH, HEIGHT);
+                renderer.shadowMapEnabled = true;
+                renderer.shadowMapType = t.PCFSoftShadowMap;
+
+
+
+                // Add the canvas to the document
+                renderer.domElement.style.backgroundColor = '#000';
+                document.body.appendChild(renderer.domElement);
+
+                // Display HUD
+                $('body').append('<div id="hud"><p>item: <span id="item">0</span><br /></p></div>');
+
+            }
+
+function animate() {
+                if (runAnim) {
+                    requestAnimationFrame(animate);
+                }
+                render();
+            }
+
+            
+
+// Update and display
+        
+
+
+function render() {
+                var i, delta = clock.getDelta(), aispeed = delta * MOVESPEED;
+                controls.update(delta);
+
+             for (var i = items.length-1; i >= 0; i--) {
+		var b = items[i], p = b.position;
+    if (distance(p.x, p.z, cam.position.x, cam.position.z) < 10 && b.owner != cam) {
+			item +=1;
+            $('#item').html(item);
+			scene.remove(b);
+        continue;
+		}
+    
+    }
+    
+    
+    for (var i = ai.length-1; i >= 0; i--) {
+		var b = ai[i], p = b.position;
+    if (distance(p.x, p.z, cam.position.x, cam.position.z) < 25 && b.owner != cam) {
+			health -= 10;
+			if (health < 0) health = 0;
+			ai.splice(i, 1);
+			scene.remove(b);
+		}
+    
+    }
+    
+
+
+                // MONSTERS
+                for (i = ai.length-1; i >= 0; i--) {
+                    var a = ai[i];
+                    // Move AI
+                    var r = Math.random();
+
+                    if (r > 0.995) {
+                        a.lastRandomX = Math.random() * 2 - 1;
+                        a.lastRandomZ = Math.random() * 2 - 1;
+                    }
+                    a.translateX(aispeed * a.lastRandomX);
+                    a.translateZ(aispeed * a.lastRandomZ);
+
+                    var c = getMapSector(a.position);
+
+
+                    if (c.x < 0 || c.x >= mapW || c.y < 0 || c.y >= mapH|| checkWallCollision(a.position)) {
+                        a.translateX(-2 * aispeed * a.lastRandomX);
+                        a.translateZ(-2 * aispeed * a.lastRandomZ);
+                        a.lastRandomX = Math.random() * 2 - 1;
+                        a.lastRandomZ = Math.random() * 2 - 1;
+                    }
+
+                    if (c.x < -1 || c.x > mapW || c.z < -1 || c.z > mapH) {
+                        scene.remove(a);
+                        addAI();
+                    }
+                    var cc = getMapSector(cam.position);
+                }
+
+                renderer.render(scene, cam);
+
+                // Death
+                if (health == 0 || item >50) {
+                    runAnim = false;
+                    
+                    if ( item> 50 )
+                  { $(renderer.domElement).fadeOut();
+                    $('#hud').fadeOut();
+                    $('#giris').fadeIn();
+                    $('#giris').html('You Win');
+                }
+                    else if (health == 0)
+                        {
+                            $(renderer.domElement).fadeOut();
+                    $('#hud').fadeOut();
+                    $('#giris').fadeIn();
+                    $('#giris').html('You Lost');
+                            
+                        }
+    
+                    $('#giris').one('click', function () {
+                        location = location;
+
+                        $(renderer.domElement).fadeIn();
+                        $('#hud').fadeIn();
+                        $(this).fadeOut();
+                        runAnim = true;
+                        animate();
+                        item = 0;
+                        $('#item').html(item);
+                        cam.translateX(-cam.position.x);
+                        cam.translateZ(-cam.position.z);
+
+                    });
+                }
+            }
+
+            // Set up the objects in the world
+function setupScene() {
+
+    
+    
+    
+                var units = mapW;
+    
+
+ //////								FLOOR 										/////
+
+           var floorTexture = new THREE.ImageUtils.loadTexture( 'textures/terrain/grass2.jpg' );
+            var floorGeometry =new t.CubeGeometry(units * UNITSIZE,10, units * UNITSIZE) ;
+            var floorMaterial =new t.MeshLambertMaterial({ map:floorTexture});
+            var floor = new t.Mesh(floorGeometry,floorMaterial);
+            
+                floor.material.map.repeat.set( 1,1 );
+				floor.material.map.wrapS = THREE.RepeatWrapping;
+				floor.material.map.wrapT = THREE.RepeatWrapping;
+				floor.receiveShadow = true;
+                floor.castShadow=false;
+                scene.add(floor);
+    
+
+	
+
+
+///// 								WALLS AND TREES    							/////
+
+                var cube = new t.CubeGeometry(UNITSIZE, WALLHEIGHT, UNITSIZE);
+                var cylinder= new t.CylinderGeometry(5,20,UNITSIZE);
+
+                var materials = [
+                                 new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/stonewall.jpeg')}),
+                                 new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/stonewall.jpeg')}),
+                                 new t.MeshLambertMaterial({color: 0xFBEBCD}),
+                                 ];
+
+
+                for (var i = 0; i < mapW; i++) {
+
+                    for (var j = 0, m = map[i].length; j < m; j++) {
+
+                        if (map[i][j] == 1 ) { 
+                            var wall = new t.Mesh(cube, materials[map[i][j]-1]);
+                            wall.position.x = (i - units/2) * UNITSIZE;
+                            wall.position.y = WALLHEIGHT/2;
+                            wall.position.z = (j - units/2) * UNITSIZE;
+                            wall.castShadow=true;
+                            wall.receiveShadow=true;
+                            scene.add(wall);
+                        }
+
+                        else if (map[i][j] == 2)
+                        {
+                            var tree = new t.Mesh(cylinder, new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/agac.jpeg')}));
+                            tree.position.x=(i - units/2) * UNITSIZE/1.5;
+                            tree.position.y = 35;
+                            tree.position.z= (j - units/2) * UNITSIZE/1.5;
+                            tree.castShadow=true;
+                            trees.push(tree);
+                            scene.add(tree);
+
+                        }
+
+                    }
+                }
+
+////      			ITEMS 	
+                for (var a=0; a<itemcount;a++)
+                {
+                    itemcube = new t.Mesh(
+                        new t.CubeGeometry(20, 20, 30),
+                        new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('textures/minecraft/grass_dirt.png')})
+
+                    );
+                itemcube.position.set(-UNITSIZE-getRandBetween(-1000, 1000), 35, -UNITSIZE-getRandBetween(-1500, 1000));  
+                itemcube.castShadow=true;
+                items.push(itemcube);
+                scene.add(itemcube);
+
+
+                }
+
+///             LIGHTS	
+    
+    var ambient	= new THREE.AmbientLight( 0x333333 );
+	scene.add( ambient );
+
+	var spotLight	= new THREE.SpotLight( 0xFFAA88 );
+	spotLight.target.position.set( 0, 2, 0 );
+	spotLight.shadowCameraNear	= 0.01;		
+	spotLight.castShadow		= true;
+	spotLight.shadowDarkness	= 0.5;
+	spotLight.shadowCameraVisible	= true;
+    console.dir(spotLight)
+    spotLight.shadowMapWidth	= 1024;
+    spotLight.shadowMapHeight	= 1024;
+	//scene.add( spotLight );	
+
+                var  flashlight = new THREE.SpotLight(0xffffff,3,3.5);
+cam.add(flashlight);
+                flashlight.position.set(0,0.05,0.1);
+                flashlight.castShadow=true;
+                flashlight.shadowMapWidth	= 1024;
+                flashlight.shadowMapHeight	= 1024;
+                flashlight.shadowCameraNear=true;
+
+                flashlight.shadowDarkness = 0.5;
+                flashlight.target = cam;
+
+            }
+
+////      		MONSTERS
+
+
+
+
+            var ai = [];
+            var aiGeo = new t.SphereGeometry(20,20,60);
+            function setupAI() 
+            {
+                for (var i = 0; i < MONS; i++) {
+                    addAI();
+                }
+
+            }
+
+
+
+
+              
+  
+      
+
+            function addAI() {
+                var c = getMapSector(cam.position);
+                
+                //var aiMaterial = new t.MeshLambertMaterial({/*color: 0xEE3333,*/map: t.ImageUtils.loadTexture('textures/planets/moon_1024.jpg')});
+               // var o = new t.Mesh(aiGeo, aiMaterial);
+                      var aiMaterial = new t.MeshLambertMaterial( {map: t.ImageUtils.loadTexture('textures/planets/moon_1024.jpg')
+    //vertexShader: document.getElementById( 'vertexShader' ).textContent,
+    //fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+} );
+
+     
+        var o = new t.Mesh( 
+            new THREE.IcosahedronGeometry( 20, 4 ), 
+           aiMaterial
+        );
+                   
+                do {
+                    var x = getRandBetween(0, mapW-1);
+                    var z = getRandBetween(0, mapH-1);
+                } while (map[x][z] > 0 || (x == c.x && z == c.z));
+                x = Math.floor(x - mapW/2) * UNITSIZE;
+                z = Math.floor(z - mapW/2) * UNITSIZE;
+                o.position.set(x, UNITSIZE * 0.2, z);
+                //o.path = getAIpath(o);
+                o.pathPos = 1;
+                o.lastRandomX = Math.random();
+                o.lastRandomZ = Math.random();
+                o.castShadow=true;
+                ai.push(o);
+
+                scene.add(o);
+            }
+
+            function getAIpath(a) {
+                var p = getMapSector(a.position);
+                do { // Cop-out
+                    do {
+                        var x = getRandBetween(0, mapW-1);
+                        var z = getRandBetween(0, mapH-1);
+                    } while (map[x][z] > 0 || distance(p.x, p.z, x, z) < 3);
+                    var path = findAIpath(p.x, p.z, x, z);
+                } while (path.length == 0);
+                return path;
+            }
+
+            function findAIpath(sX, sZ, eX, eZ) {
+
+                var backupGrid = grid.clone();
+                var path = finder.findPath(sX, sZ, eX, eZ, grid);
+                grid = backupGrid;
+                return path;
+
+            }
+
+            function distance(x1, y1, x2, y2) {
+                return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+            }
+
+            function getMapSector(v) {
+                var x = Math.floor((v.x + UNITSIZE / 2) / UNITSIZE + mapW/2);
+                var z = Math.floor((v.z + UNITSIZE / 2) / UNITSIZE + mapW/2);
+                return {x: x, z: z};
+            }
+
+
+            function checkWallCollision(v) {
+                var c = getMapSector(v);
+                return map[c.x][c.z] > 0;
+            }
+
+            function onDocumentMouseMove(e) {
+                e.preventDefault();
+                mouse.x = (e.clientX / WIDTH) * 2 - 1;
+                mouse.y = -(e.clientY / HEIGHT) * 2 + 1;
+            }
+
+            // Handle window resizing
+            $(window).resize(function() {
+                WIDTH = window.innerWidth;
+                HEIGHT = window.innerHeight;
+                ASPECT = WIDTH / HEIGHT;
+                if (cam) {
+                    cam.aspect = ASPECT;
+                    cam.updateProjectionMatrix();
+                }
+                if (renderer) {
+                    renderer.setSize(WIDTH, HEIGHT);
+                }
+                $('#giris, #hurt').css({width: WIDTH, height: HEIGHT,});
+            });
+
+            $(window).focus(function() {
+                if (controls) controls.freeze = false;
+            });
+            $(window).blur(function() {
+                if (controls) controls.freeze = true;
+            });
+
+            function getRandBetween(lo, hi) {
+             return parseInt(Math.floor(Math.random()*(hi-lo+1))+lo, 10);
+            }
+
+
+    </script>
+</body>
+</html>
